@@ -45,7 +45,7 @@
   :group 'ag)
 
 (defcustom ag-arguments
-  (list "--line-number" "--smart-case" "--nogroup" "--column" "--stats" "--")
+  (list "--line-number" "--vimgrep" "--smart-case" "--nogroup" "--column" "--stats" "--")
   "Default arguments passed to ag.
 
 Ag.el requires --nogroup and --column, so we recommend you add any
