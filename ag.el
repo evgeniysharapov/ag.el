@@ -93,6 +93,15 @@ If set to nil, fall back to finding VCS root directories."
   :type '(repeat (string))
   :group 'ag)
 
+(defcustom ag-vimgrep (eq system-type 'windows-nt)
+  "Use --vimgrep option when run `ag'.
+
+One situation when you want to use --vimgrep option is when you
+use Windows.  This is issue of `ag' tool.  Without --vimgrep on
+Windows ag is not going to work (issue #97)."
+  :type 'boolean
+  :group 'ag)
+
 (require 'compile)
 
 ;; Although ag results aren't exactly errors, we treat them as errors
@@ -187,10 +196,9 @@ If REGEXP is non-nil, treat STRING as a regular expression."
         ;; sequences.
         (setq arguments (append '("--color" "--color-match" "30;43") arguments))
       ;; We're not highlighting.
-      (if (eq system-type 'windows-nt)
-          ;; Use --vimgrep to work around issue #97 on Windows.
-          (setq arguments (append '("--vimgrep") arguments))
-        (setq arguments (append '("--nocolor") arguments))))
+      (setq arguments (append '("--nocolor") arguments)))
+    (when ag-vimgrep
+      (setq arguments (append '("--vimgrep") arguments)))
     (when (char-or-string-p file-regex)
       (setq arguments (append `("--file-search-regex" ,file-regex) arguments)))
     (when file-type
@@ -592,15 +600,26 @@ This function is called from `compilation-filter-hook'."
         ;; escape sequence in one chunk and the rest in another.
         (when (< (point) end)
           (setq end (copy-marker end))
-          ;; Highlight ag matches and delete marking sequences.
-          (while (re-search-forward "\033\\[30;43m\\(.*?\\)\033\\[[0-9]*m" end 1)
-            (replace-match (propertize (match-string 1)
-                                       'face nil 'font-lock-face 'ag-match-face)
-                           t t))
-          ;; Delete all remaining escape sequences
-          (goto-char beg)
-          (while (re-search-forward "\033\\[[0-9;]*[mK]" end 1)
-            (replace-match "" t t)))))))
+          (if ag-vimgrep
+              ;; --vimgrep prevents escape sequences in the
+              ;; output, so we will highlight using Emacs
+              (progn
+                (while (re-search-forward (concat "\\(" (car minibuffer-history) "\\)") end 1)
+                  (replace-match (propertize (match-string 1)
+                                             'face nil 'font-lock-face 'ag-match-face)
+                                 t t)))
+            ;; Highlighting by replacing escape sequences
+            (progn
+              ;; Highlight ag matches and delete marking sequences.
+              (while (re-search-forward "\033\\[30;43m\\(.*?\\)\033\\[[0-9]*m" end 1)
+                (replace-match (propertize (match-string 1)
+                                           'face nil 'font-lock-face 'ag-match-face)
+                               t t))
+              ;; Delete all remaining escape sequences
+              (goto-char beg)
+              (while (re-search-forward "\033\\[[0-9;]*[mK]" end 1)
+                (replace-match "" t t))
+              )))))))
 
 (defun ag/get-supported-types ()
   "Query the ag executable for which file types it recognises."
