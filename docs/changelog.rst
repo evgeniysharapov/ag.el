@@ -7,7 +7,19 @@ Previous Versions
 master
 ------
 
-No changes yes.
+No changes yet.
+
+0.47
+~~~~
+
+Added a workaround for an ag bug on windows where results were shown
+without filenames (see issue #97). Note this only applies when
+``ag-highlight-search`` is nil.
+
+Fixed an issue where ``ag-projects-regexp`` escaped its input,
+resulting in literal searches rather than regexp searches (see #94).
+
+Detection of project roots now supports bzr.
 
 0.46
 ~~~~

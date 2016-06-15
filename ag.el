@@ -4,7 +4,7 @@
 ;;
 ;; Author: Wilfred Hughes <me@wilfred.me.uk>
 ;; Created: 11 January 2013
-;; Version: 0.47
+;; Version: 0.48
 ;; Package-Requires: ((dash "2.8.0") (s "1.9.0") (cl-lib "0.5"))
 ;;; Commentary:
 
@@ -51,7 +51,7 @@
 Ag.el requires --nogroup and --column, so we recommend you add any
 additional arguments to the start of this list.
 
---line-number is required on Window, as otherwise ag will not
+--line-number is required on Windows, as otherwise ag will not
 print line numbers when the input is a stream."
   :type '(repeat (string))
   :group 'ag)
@@ -182,12 +182,21 @@ If REGEXP is non-nil, treat STRING as a regular expression."
     (unless regexp
       (setq arguments (cons "--literal" arguments)))
     (if ag-highlight-search
+        ;; We're highlighting, so pass additional arguments for
+        ;; highlighting the current search term using shell escape
+        ;; sequences.
         (setq arguments (append '("--color" "--color-match" "30;43") arguments))
-      (setq arguments (append '("--nocolor") arguments)))
+      ;; We're not highlighting.
+      (if (eq system-type 'windows-nt)
+          ;; Use --vimgrep to work around issue #97 on Windows.
+          (setq arguments (append '("--vimgrep") arguments))
+        (setq arguments (append '("--nocolor") arguments))))
     (when (char-or-string-p file-regex)
       (setq arguments (append `("--file-search-regex" ,file-regex) arguments)))
     (when file-type
       (setq arguments (cons (format "--%s" file-type) arguments)))
+    (when (integerp current-prefix-arg)
+      (setq arguments (cons (format "--context=%d" (abs current-prefix-arg)) arguments)))
     (when ag-ignore-list
       (setq arguments (append (ag/format-ignore ag-ignore-list) arguments)))
     (unless (file-exists-p default-directory)
@@ -198,7 +207,9 @@ If REGEXP is non-nil, treat STRING as a regular expression."
                       " ")))
       ;; If we're called with a prefix, let the user modify the command before
       ;; running it. Typically this means they want to pass additional arguments.
-      (when current-prefix-arg
+      ;; The numeric value is used for context lines: positive is just context
+      ;; number (no modification), negative allows further modification.
+      (when (and current-prefix-arg (not (and (integerp current-prefix-arg) (> current-prefix-arg 0))))
         ;; Make a space in the command-string for the user to enter more arguments.
         (setq command-string (ag/replace-first command-string " -- " "  -- "))
         ;; Prompt for the command.
@@ -259,6 +270,8 @@ Returns an empty string otherwise."
 
 (autoload 'vc-hg-root "vc-hg")
 
+(autoload 'vc-bzr-root "vc-bzr")
+
 (defun ag/project-root (file-path)
   "Guess the project root of the given FILE-PATH.
 
@@ -269,7 +282,8 @@ roots."
     (or (ag/longest-string
        (vc-git-root file-path)
        (vc-svn-root file-path)
-       (vc-hg-root file-path))
+       (vc-hg-root file-path)
+       (vc-bzr-root file-path))
       file-path)))
 
 (defun ag/dired-align-size-column ()
